@@ -155,8 +155,7 @@ def load(app):
     except Exception as e:
       return jsonify({"error": str(e)}), 500
 
-  # todo GET /groups/:id/words/raw
-
+  
   @app.route('/groups/<int:id>/study_sessions', methods=['GET'])
   @cross_origin()
   def get_group_study_sessions(id):

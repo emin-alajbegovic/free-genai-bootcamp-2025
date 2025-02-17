@@ -151,7 +151,59 @@ def load(app):
     except Exception as e:
       return jsonify({"error": str(e)}), 500
 
-  # todo POST /study_sessions/:id/review
+  @app.route('/api/study-sessions/<id>/review', methods=['POST'])
+  @cross_origin()
+  def create_session_review(id):
+    try:
+      data = request.get_json()
+      
+      # Validate required fields
+      if 'word_id' not in data:
+        return jsonify({"error": "Missing required field: word_id"}), 400
+      if 'correct' not in data:
+        return jsonify({"error": "Missing required field: correct"}), 400
+        
+      cursor = app.db.cursor()
+      
+      # Verify study session exists
+      cursor.execute('SELECT id FROM study_sessions WHERE id = ?', (id,))
+      if not cursor.fetchone():
+        return jsonify({"error": "Study session not found"}), 404
+      
+      # Create review item
+      cursor.execute('''
+        INSERT INTO word_review_items (
+          study_session_id,
+          word_id,
+          correct,
+          created_at
+        ) VALUES (?, ?, ?, datetime('now'))
+      ''', (id, data['word_id'], 1 if data['correct'] else 0))
+      
+      # Update word_reviews table
+      cursor.execute('''
+        INSERT INTO word_reviews (word_id, correct_count, wrong_count)
+        VALUES (?, 
+          CASE WHEN ? THEN 1 ELSE 0 END,
+          CASE WHEN ? THEN 0 ELSE 1 END
+        )
+        ON CONFLICT(word_id) DO UPDATE SET
+          correct_count = correct_count + CASE WHEN ? THEN 1 ELSE 0 END,
+          wrong_count = wrong_count + CASE WHEN ? THEN 0 ELSE 1 END
+      ''', (
+        data['word_id'],
+        data['correct'],
+        data['correct'],
+        data['correct'],
+        data['correct']
+      ))
+      
+      app.db.commit()
+      
+      return jsonify({"message": "Review recorded successfully"}), 201
+      
+    except Exception as e:
+      return jsonify({"error": str(e)}), 500
 
   @app.route('/api/study-sessions/reset', methods=['POST'])
   @cross_origin()
@@ -168,5 +220,59 @@ def load(app):
       app.db.commit()
       
       return jsonify({"message": "Study history cleared successfully"}), 200
+    except Exception as e:
+      return jsonify({"error": str(e)}), 500
+
+  @app.route('/api/study-sessions', methods=['POST'])
+  @cross_origin()
+  def create_study_session():
+    try:
+      data = request.get_json()
+      
+      # Validate required fields
+      required_fields = ['group_id', 'study_activity_id']
+      for field in required_fields:
+        if field not in data:
+          return jsonify({"error": f"Missing required field: {field}"}), 400
+      
+      cursor = app.db.cursor()
+      
+      # Create new study session
+      cursor.execute('''
+        INSERT INTO study_sessions (group_id, study_activity_id, created_at)
+        VALUES (?, ?, datetime('now'))
+      ''', (data['group_id'], data['study_activity_id']))
+      
+      session_id = cursor.lastrowid
+      app.db.commit()
+      
+      # Return the created session
+      cursor.execute('''
+        SELECT 
+          ss.id,
+          ss.group_id,
+          g.name as group_name,
+          sa.id as activity_id,
+          sa.name as activity_name,
+          ss.created_at
+        FROM study_sessions ss
+        JOIN groups g ON g.id = ss.group_id
+        JOIN study_activities sa ON sa.id = ss.study_activity_id
+        WHERE ss.id = ?
+      ''', (session_id,))
+      
+      session = cursor.fetchone()
+      
+      return jsonify({
+        'id': session['id'],
+        'group_id': session['group_id'],
+        'group_name': session['group_name'],
+        'activity_id': session['activity_id'],
+        'activity_name': session['activity_name'],
+        'start_time': session['created_at'],
+        'end_time': session['created_at'],
+        'review_items_count': 0
+      }), 201
+      
     except Exception as e:
       return jsonify({"error": str(e)}), 500

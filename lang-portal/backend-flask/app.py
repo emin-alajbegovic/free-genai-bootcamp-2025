@@ -1,5 +1,7 @@
 from flask import Flask, g
 from flask_cors import CORS
+import sqlite3
+import os
 
 from lib.db import Db
 
@@ -28,15 +30,36 @@ def get_allowed_origins(app):
     except:
         return ["*"]  # Fallback to allow all origins if there's an error
 
-def create_app(test_config=None):
+def get_db(app):
+    if 'db' not in g:
+        if app.config['TESTING']:
+            g.db = sqlite3.connect(':memory:', check_same_thread=False)
+            # Initialize test database schema here
+            with app.open_resource('schema.sql', mode='r') as f:
+                g.db.executescript(f.read())
+        else:
+            g.db = sqlite3.connect('database.db', check_same_thread=False)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+def create_app(config_name='default'):
     app = Flask(__name__)
     
-    if test_config is None:
-        app.config.from_mapping(
-            DATABASE='words.db'
-        )
+    # Configuration
+    if config_name == 'testing':
+        app.config['TESTING'] = True
+        app.config['DATABASE'] = ':memory:'
     else:
-        app.config.update(test_config)
+        app.config['TESTING'] = False
+        app.config['DATABASE'] = 'database.db'
+    
+    # Database setup
+    with app.app_context():
+        if app.config['TESTING']:
+            db = get_db(app)
+            # Initialize test database schema
+            with app.open_resource('schema.sql', mode='r') as f:
+                db.executescript(f.read())
     
     # Initialize database first since we need it for CORS configuration
     app.db = Db(database=app.config['DATABASE'])
@@ -71,7 +94,6 @@ def create_app(test_config=None):
     
     return app
 
-app = create_app()
-
 if __name__ == '__main__':
+    app = create_app()
     app.run(debug=True)
