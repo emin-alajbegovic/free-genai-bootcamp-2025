@@ -3,7 +3,10 @@ import sys
 import os
 import json
 from datetime import datetime
-from pathlib import Path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from backend.question_generator import QuestionGenerator
+from backend.audio_generator import AudioGenerator
 
 # Page config
 st.set_page_config(
@@ -12,20 +15,23 @@ st.set_page_config(
     layout="wide"
 )
 
-# Define project root directory
-PROJECT_ROOT = Path(__file__).parent.parent
-
 def load_stored_questions():
     """Load previously stored questions from JSON file"""
-    questions_file = PROJECT_ROOT / "backend/data/stored_questions.json"
-    if questions_file.exists():
+    questions_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "backend/data/stored_questions.json"
+    )
+    if os.path.exists(questions_file):
         with open(questions_file, 'r', encoding='utf-8') as f:
             return json.load(f)
     return {}
 
 def save_question(question, practice_type, topic, audio_file=None):
     """Save a generated question to JSON file"""
-    questions_file = PROJECT_ROOT / "backend/data/stored_questions.json"
+    questions_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "backend/data/stored_questions.json"
+    )
     
     # Load existing questions
     stored_questions = load_stored_questions()
@@ -46,7 +52,7 @@ def save_question(question, practice_type, topic, audio_file=None):
     stored_questions[question_id] = question_data
     
     # Save back to file
-    os.makedirs(questions_file.parent, exist_ok=True)
+    os.makedirs(os.path.dirname(questions_file), exist_ok=True)
     with open(questions_file, 'w', encoding='utf-8') as f:
         json.dump(stored_questions, f, ensure_ascii=False, indent=2)
     

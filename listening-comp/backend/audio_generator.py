@@ -13,7 +13,7 @@ class AudioGenerator:
     def __init__(self):
         # AWS clients
         self.bedrock = boto3.client('bedrock-runtime', region_name="us-east-1")
-        self.polly = boto3.client('polly')
+        self.polly = boto3.client('polly', region_name="us-east-1")
         self.model_id = "amazon.nova-micro-v1:0"
         
         # Google Cloud TTS client
